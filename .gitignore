@@ -1,0 +1,9 @@
+*.user
+*.pro.user
+.qtcreator/
+.qmake.stash
+Makefile*
+build/
+release/
+release_build/
+bin/
