@@ -26,7 +26,20 @@ bool FileScanner::isProtectedPath(const QString &path)
         if (volumeRelative.startsWith(root))
             return true;
     }
-    const QString name = QFileInfo(p).fileName();
+    if (volumeRelative.startsWith(QStringLiteral("users\\")) &&
+        (volumeRelative.contains(QStringLiteral("\\appdata\\")) ||
+         volumeRelative.contains(QStringLiteral("\\ntuser."))))
+        return true;
+
+    const QFileInfo info(p);
+    const QString name = info.fileName();
+    const QString suffix = info.suffix().toLower();
+    if (suffix == QStringLiteral("exe") || suffix == QStringLiteral("dll") ||
+        suffix == QStringLiteral("sys") || suffix == QStringLiteral("drv") ||
+        suffix == QStringLiteral("msi") || suffix == QStringLiteral("bat") ||
+        suffix == QStringLiteral("cmd") || suffix == QStringLiteral("ps1"))
+        return true;
+
     return name == QStringLiteral("pagefile.sys") ||
            name == QStringLiteral("hiberfil.sys") ||
            name == QStringLiteral("swapfile.sys") ||
