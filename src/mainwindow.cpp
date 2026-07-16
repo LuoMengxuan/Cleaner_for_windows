@@ -129,7 +129,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_minimumSize(nullptr), m_scanButton(nullptr), m_stopButton(nullptr), m_deleteButton(nullptr),
       m_openLocationButton(nullptr), m_copyPathButton(nullptr), m_categoryReviewButton(nullptr),
       m_statusLabel(nullptr),
-      m_pathLabel(nullptr), m_scanProgressLabel(nullptr), m_scanProgress(nullptr),
+      m_pathLabel(nullptr), m_resultSummaryLabel(nullptr), m_scanProgressLabel(nullptr), m_scanProgress(nullptr),
       m_driveLayout(nullptr), m_trayIcon(nullptr),
       m_scanThread(new QThread(this)), m_scanner(new FileScanner),
       m_scanning(false), m_quitting(false)
@@ -169,7 +169,6 @@ void MainWindow::setupUi()
     ui->subtitleLabel->setObjectName(QStringLiteral("subtitle"));
     ui->pathLabel->setObjectName(QStringLiteral("pathHint"));
     ui->statusLabel->setObjectName(QStringLiteral("status"));
-    ui->driveCard->setObjectName(QStringLiteral("card"));
     ui->guideCard->setObjectName(QStringLiteral("guideCard"));
     ui->guideIcon->setObjectName(QStringLiteral("guideBadge"));
     ui->guideText->setObjectName(QStringLiteral("guideText"));
@@ -190,9 +189,10 @@ void MainWindow::setupUi()
     m_categoryReviewButton = ui->categoryReviewButton;
     m_statusLabel = ui->statusLabel;
     m_pathLabel = ui->pathLabel;
+    m_resultSummaryLabel = ui->resultSummaryLabel;
     m_scanProgressLabel = ui->scanProgressLabel;
     m_scanProgress = ui->scanProgressBar;
-    m_driveLayout = ui->driveLayout;
+    m_driveLayout = ui->driveListLayout;
 
     m_minimumSize->addItem(QStringLiteral("100 MB（推荐）"), 100LL * 1024 * 1024);
     m_minimumSize->addItem(QStringLiteral("500 MB"), 500LL * 1024 * 1024);
@@ -209,37 +209,29 @@ void MainWindow::setupUi()
             header->setTextAlignment(Qt::AlignCenter);
     }
     m_table->verticalHeader()->setVisible(false);
-    m_table->verticalHeader()->setDefaultSectionSize(30);
+    m_table->verticalHeader()->setDefaultSectionSize(34);
     m_table->setSortingEnabled(false);
     m_table->setContextMenuPolicy(Qt::CustomContextMenu);
 
     setStyleSheet(QStringLiteral(
-        "QMainWindow { background: transparent; }"
-        "QWidget#centralWidget { background: transparent; }"
-        "QWidget { color: #172b4d; }"
-        "#title { font-size: 27px; font-weight: 700; color: #0d3155; }"
-        "#subtitle { color: #4d6480; font-size: 13px; }"
-        "#card { background: rgba(255, 255, 255, 226); border: 1px solid rgba(209, 225, 239, 230); border-radius: 12px; }"
-        "#guideCard { background: rgba(234, 248, 255, 220); border: 1px solid rgba(125, 198, 224, 160); border-radius: 10px; }"
-        "#guideBadge { color: #0f5f87; font-weight: 700; padding: 4px 8px; background: rgba(137, 219, 232, 110); border-radius: 8px; }"
-        "#guideText { color: #245274; font-size: 13px; }"
-        "#safetyHint { color: #60758b; }"
-        "#progressBadge { color: #1d5d82; font-weight: 700; min-width: 64px; }"
-        "#status { color: #164b76; font-weight: 600; padding: 2px 0; }"
-        "#pathHint { color: #61738a; }"
-        "QTableWidget { background: rgba(255, 255, 255, 235); border: 1px solid rgba(207, 222, 235, 235); border-radius: 10px; gridline-color: transparent; selection-background-color: #d8f1fb; selection-color: #12314e; }"
-        "QTableWidget::item { padding: 4px 6px; border-bottom: 1px solid #edf3f8; }"
-        "QHeaderView::section { background: rgba(232, 243, 251, 245); color: #31566f; padding: 9px 7px; border: 0; border-right: 1px solid #dce9f2; font-weight: 700; }"
-        "QComboBox, QPushButton { min-height: 31px; padding: 4px 11px; border: 1px solid #b9cede; border-radius: 7px; background: rgba(255, 255, 255, 238); }"
-        "QComboBox:hover, QPushButton:hover { background: #f0f9fd; border-color: #78b8d9; }"
-        "QPushButton:disabled { color: #92a2af; background: rgba(236, 241, 245, 220); border-color: #d5e0e8; }"
-        "QPushButton#primary { color: white; background: #1677a9; border-color: #1677a9; font-weight: 700; }"
-        "QPushButton#primary:hover { background: #0f6695; }"
-        "QPushButton#danger { color: #b63a45; background: #fff7f7; border-color: #efbcc1; }"
-        "QPushButton#danger:hover { background: #fff0f1; border-color: #e08b94; }"
-        "QProgressBar { border: 1px solid #c9dce9; border-radius: 6px; background: #edf4f8; text-align: center; min-height: 18px; }"
-        "QProgressBar::chunk { background: #3cabc1; border-radius: 5px; }"
-        "QCheckBox { spacing: 7px; }"));
+        "QMainWindow { background: transparent; } QWidget#centralWidget { background: transparent; } QWidget { color: #20384d; }"
+        "#heroFrame { background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #12396c,stop:1 #13879a); border: 0; border-radius: 16px; }"
+        "#brandMark { color: #0a5470; background: #d8fbf4; border-radius: 27px; font-size: 29px; font-family: Georgia; font-weight: 700; }"
+        "#title { color: white; font-size: 25px; font-weight: 700; } #subtitle { color: #d9eff5; font-size: 13px; }"
+        "#heroStatusBadge { color: #d8fbf4; background: rgba(6,46,76,125); border: 1px solid rgba(218,255,248,125); border-radius: 12px; padding: 8px 12px; font-weight: 700; }"
+        "#guideCard { background: rgba(235,248,253,235); border: 1px solid #c9e8f0; border-radius: 10px; } #guideBadge { color: #0f6479; font-weight: 700; padding: 5px 9px; background: #d8f5f2; border-radius: 8px; } #guideText { color: #346177; font-size: 13px; }"
+        "#driveCard, #scanPanel, #resultsPanel, #statusPanel { background: rgba(255,255,255,238); border: 1px solid #d7e5ef; border-radius: 13px; }"
+        "#drivePanelTitle, #scanPanelTitle, #resultsTitle { color: #173d61; font-size: 16px; font-weight: 700; } #drivePanelHint, #scanPanelHint { color: #708398; font-size: 12px; } #driveRow { background: #f8fbfd; border-radius: 8px; } #driveName { color: #365871; font-weight: 700; } #driveUsage { min-height: 18px; }"
+        "#resultsTitle { font-size: 17px; } #resultSummaryLabel { color: #11758a; background: #e6f6f8; padding: 4px 9px; border-radius: 9px; font-weight: 700; }"
+        "#safetyHint { color: #63788e; } #progressBadge { color: #13748e; font-weight: 700; min-width: 64px; } #status { color: #164d75; font-weight: 700; } #pathHint { color: #6c8093; }"
+        "QTableWidget { background: white; border: 1px solid #dbe7ef; border-radius: 9px; gridline-color: transparent; selection-background-color: #d8f1f4; selection-color: #123f58; } QTableWidget::item { padding: 6px 7px; border-bottom: 1px solid #edf3f7; }"
+        "QHeaderView::section { background: #eef6f9; color: #42657c; padding: 10px 7px; border: 0; border-right: 1px solid #dce9f0; font-weight: 700; }"
+        "QComboBox, QPushButton { min-height: 33px; padding: 5px 12px; border: 1px solid #bfd3e0; border-radius: 8px; background: #fff; } QComboBox:hover, QPushButton:hover { background: #f0faff; border-color: #71b8cd; }"
+        "QPushButton:disabled { color: #99aab7; background: #f1f5f7; border-color: #d9e3e9; } QPushButton#primary { color: white; background: #107c98; border-color: #107c98; font-weight: 700; } QPushButton#primary:hover { background: #0b6883; }"
+        "QPushButton#danger { color: #b63b4a; background: #fff6f6; border-color: #efc2c8; font-weight: 700; } QPushButton#danger:hover { background: #ffecef; border-color: #df8f9a; }"
+        "QPushButton#categoryReviewButton { color: #5b4589; background: #f5f1ff; border-color: #d8caf2; font-weight: 700; } QPushButton#categoryReviewButton:hover { background: #ece2ff; border-color: #b79add; }"
+        "QProgressBar { border: 1px solid #c9dce7; border-radius: 7px; background: #edf5f8; text-align: center; min-height: 19px; } QProgressBar::chunk { background: #2aa6b8; border-radius: 6px; }"
+        "QCheckBox { spacing: 7px; } QMenuBar { background: transparent; color: #31536b; } QMenu { background: white; border: 1px solid #d9e5ed; padding: 5px; } QMenu::item { padding: 7px 26px 7px 12px; border-radius: 4px; } QMenu::item:selected { background: #e7f4f7; }"));
 
     connect(m_scanButton, &QPushButton::clicked, this, &MainWindow::startScan);
     connect(m_stopButton, &QPushButton::clicked, this, &MainWindow::stopScan);
@@ -391,12 +383,15 @@ void MainWindow::refreshDrives()
         m_driveSelector->addItem(label, drive.rootPath());
 
         QWidget *row = new QWidget;
+        row->setObjectName(QStringLiteral("driveRow"));
         QHBoxLayout *layout = new QHBoxLayout(row);
-        layout->setContentsMargins(0, 2, 0, 2);
+        layout->setContentsMargins(10, 5, 10, 5);
         QLabel *name = new QLabel(QStringLiteral("%1  可用 %2 / %3")
                                       .arg(root, formatBytes(drive.bytesAvailable()), formatBytes(drive.bytesTotal())));
+        name->setObjectName(QStringLiteral("driveName"));
         name->setMinimumWidth(290);
         QProgressBar *bar = new QProgressBar;
+        bar->setObjectName(QStringLiteral("driveUsage"));
         bar->setRange(0, 100);
         bar->setValue(percent);
         bar->setFormat(QStringLiteral("已使用 %1%").arg(percent));
@@ -462,6 +457,8 @@ void MainWindow::startScan()
     m_table->clearContents();
     m_table->setRowCount(0);
     resetSelectionUi();
+    m_resultSummaryLabel->setText(QStringLiteral("正在安全扫描 · 等待发现大文件"));
+    ui->heroStatusBadge->setText(QStringLiteral("● 正在进行安全扫描"));
     m_scanProgressLabel->setText(QStringLiteral("扫描进行中"));
     m_scanProgress->setRange(0, 0);
     m_scanProgress->setFormat(QStringLiteral("正在扫描，请稍候……"));
@@ -517,7 +514,7 @@ void MainWindow::showBeginnerGuide()
 void MainWindow::showDeveloperInfo()
 {
     showFriendlyMessage(QStringLiteral("开发者信息"),
-        QStringLiteral("作者：Vincinzo\n版本：1.21\nGit 版本：v1.2.1\n时间：%1")
+        QStringLiteral("作者：Vincinzo\n版本：1.30\nGit 版本：v1.3.0\n时间：%1")
             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))),
         QStringLiteral("Copyright © 2026 Vincinzo. 保留所有权利。\n谢谢你认真照顾自己的电脑。"));
 }
@@ -559,6 +556,7 @@ void MainWindow::addFile(const QString &path, qint64 size, bool protectedFile)
     m_table->setItem(row, 4, status);
     if (ui->filterSafeCheckBox->isChecked() && level != DefaultCleanableCache)
         m_table->setRowHidden(row, true);
+    m_resultSummaryLabel->setText(QStringLiteral("已发现 %1 项大文件").arg(m_table->rowCount()));
 }
 
 void MainWindow::updateProgress(qint64 visited, qint64 bytes, const QString &path)
@@ -582,6 +580,8 @@ void MainWindow::scanFinished(qint64 visited, qint64 matched, qint64 bytes, bool
         m_table->sortItems(2, Qt::DescendingOrder);
 
     if (cancelled) {
+        m_resultSummaryLabel->setText(QStringLiteral("扫描已暂停 · 已保留 %1 项结果").arg(matched));
+        ui->heroStatusBadge->setText(QStringLiteral("● 扫描已安全暂停"));
         m_statusLabel->setText(QStringLiteral("扫描已暂停，已为你保留当前找到的 %1 个大文件。")
                                    .arg(matched));
         QTimer::singleShot(2600, this, [this] {
@@ -595,6 +595,8 @@ void MainWindow::scanFinished(qint64 visited, qint64 matched, qint64 bytes, bool
 
     m_statusLabel->setText(QStringLiteral("扫描完成：检查 %1 个文件，找到 %2 个大文件，共 %3。")
                                .arg(visited).arg(matched).arg(formatBytes(bytes)));
+    m_resultSummaryLabel->setText(QStringLiteral("已分析 %1 项 · 共占用 %2").arg(matched).arg(formatBytes(bytes)));
+    ui->heroStatusBadge->setText(QStringLiteral("● 扫描完成，等待确认"));
     m_trayIcon->showMessage(QStringLiteral("扫描完成"), m_statusLabel->text(), QSystemTrayIcon::Information, 5000);
     if (matched == 0) {
         showFriendlyMessage(QStringLiteral("太棒了，空间很整洁"),
@@ -838,6 +840,8 @@ void MainWindow::clearResults()
     m_table->setRowCount(0);
     m_table->setSortingEnabled(true);
     resetSelectionUi();
+    m_resultSummaryLabel->setText(QStringLiteral("等待开始扫描"));
+    ui->heroStatusBadge->setText(QStringLiteral("● 系统守护已就绪"));
     m_pathLabel->clear();
     m_statusLabel->setText(QStringLiteral("本次结果已清空。需要时重新扫描就好，不用着急。"));
     updateSelectionState();
@@ -948,6 +952,9 @@ void MainWindow::deleteSelected()
     resetSelectionUi();
     refreshDrives();
     updateSelectionState();
+    m_resultSummaryLabel->setText(m_table->rowCount() == 0
+        ? QStringLiteral("本轮结果已处理完毕")
+        : QStringLiteral("剩余 %1 项等待确认").arg(m_table->rowCount()));
     QString message;
     if (success > 0)
         message = QStringLiteral("干得漂亮！我已经帮你把 %1 个文件放进回收站了，暂时释放约 %2 空间。")

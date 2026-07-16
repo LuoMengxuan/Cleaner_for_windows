@@ -78,6 +78,7 @@ private:
     QPushButton *m_categoryReviewButton;
     QLabel *m_statusLabel;
     QLabel *m_pathLabel;
+    QLabel *m_resultSummaryLabel;
     QLabel *m_scanProgressLabel;
     QProgressBar *m_scanProgress;
     QVBoxLayout *m_driveLayout;
