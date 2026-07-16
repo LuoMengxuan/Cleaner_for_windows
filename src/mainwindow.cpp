@@ -662,6 +662,15 @@ void MainWindow::showCategoryReview()
         m_table->setCurrentCell(row, 1);
         openSelectedFileLocation();
     });
+    connect(&categoryDialog, &CategoryReviewDialog::deleteSelectedRequested,
+            this, [this, &categoryDialog] {
+        deleteSelected();
+        categoryDialog.refreshFromSource();
+    });
+    connect(&categoryDialog, &QDialog::accepted, this, [this] {
+        refreshDrives();
+        updateSelectionState();
+    });
     categoryDialog.exec();
     updateSelectionState();
     return;

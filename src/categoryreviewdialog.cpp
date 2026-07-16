@@ -55,6 +55,8 @@ CategoryReviewDialog::CategoryReviewDialog(QTableWidget *sourceTable, QWidget *p
         "QHeaderView::section { background: #eef6f9; color: #42657c; border: none; border-bottom: 1px solid #d8e5ed; padding: 8px; font-weight: 700; }"
         "QTreeWidget::item { padding: 5px; } QTreeWidget::item:selected { background: #ddf0f4; color: #173f61; }"
         "#selectionHint { color: #4a768a; background: #eff9fa; border-radius: 6px; padding: 7px 9px; }"
+        "#deleteSelectedButton { color: white; background: #137a95; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 700; } "
+        "#deleteSelectedButton:hover { background: #0d667f; } #deleteSelectedButton:disabled { color: #91a4b1; background: #e8eef2; }"
         "QDialogButtonBox QPushButton { color: white; background: #137a95; border: none; border-radius: 7px; padding: 8px 18px; font-weight: 700; } QDialogButtonBox QPushButton:hover { background: #0d667f; }"));
 
     ui->categoryTree->setColumnCount(5);
@@ -70,6 +72,7 @@ CategoryReviewDialog::CategoryReviewDialog(QTableWidget *sourceTable, QWidget *p
     ui->categoryTree->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
     ui->buttonBox->button(QDialogButtonBox::Close)->setText(QStringLiteral("确认选择并返回主界面"));
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::accept);
+    connect(ui->deleteSelectedButton, &QPushButton::clicked, this, &CategoryReviewDialog::deleteSelectedRequested);
 
     for (int section = 0; section < SectionCount; ++section) {
         connect(m_sectionButtons[section], &QToolButton::clicked, this, [this, section] {
@@ -80,8 +83,10 @@ CategoryReviewDialog::CategoryReviewDialog(QTableWidget *sourceTable, QWidget *p
         if (column != 0 || !item->flags().testFlag(Qt::ItemIsUserCheckable))
             return;
         const int row = item->data(0, Qt::UserRole).toInt();
-        if (m_sourceTable && m_sourceTable->item(row, 0))
+        if (m_sourceTable && m_sourceTable->item(row, 0)) {
             m_sourceTable->item(row, 0)->setCheckState(item->checkState(0));
+            updateDeleteAction();
+        }
     });
     connect(ui->categoryTree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem *item, int column) {
         if (column == 2 && item->flags().testFlag(Qt::ItemIsSelectable))
@@ -93,6 +98,11 @@ CategoryReviewDialog::CategoryReviewDialog(QTableWidget *sourceTable, QWidget *p
 CategoryReviewDialog::~CategoryReviewDialog()
 {
     delete ui;
+}
+
+void CategoryReviewDialog::refreshFromSource()
+{
+    populate();
 }
 
 int CategoryReviewDialog::sectionForRow(int row) const
@@ -122,6 +132,7 @@ void CategoryReviewDialog::populate()
     ui->summaryLabel->setText(QStringLiteral("已自动分组 %1 项文件 · 缓存文件已默认勾选").arg(
         m_counts[CacheSection] + m_counts[MediaSection] + m_counts[PersonalSection] + m_counts[ProtectedSection]));
     showSection(CacheSection);
+    updateDeleteAction();
 }
 
 void CategoryReviewDialog::showSection(int section)
@@ -175,4 +186,22 @@ void CategoryReviewDialog::addFileItem(int row)
         item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
         item->setCheckState(0, check->checkState());
     }
+}
+
+void CategoryReviewDialog::updateDeleteAction()
+{
+    int selectedCount = 0;
+    if (m_sourceTable) {
+        for (int row = 0; row < m_sourceTable->rowCount(); ++row) {
+            QTableWidgetItem *check = m_sourceTable->item(row, 0);
+            if (check && check->data(Qt::UserRole).toInt() != ProtectedFile &&
+                check->checkState() == Qt::Checked) {
+                ++selectedCount;
+            }
+        }
+    }
+    ui->deleteSelectedButton->setEnabled(selectedCount > 0);
+    ui->deleteSelectedButton->setText(selectedCount > 0
+        ? QStringLiteral("将已选 %1 项移入回收站").arg(selectedCount)
+        : QStringLiteral("请先勾选要处理的文件"));
 }

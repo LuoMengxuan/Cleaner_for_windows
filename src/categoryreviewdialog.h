@@ -16,9 +16,11 @@ class CategoryReviewDialog : public QDialog
 public:
     explicit CategoryReviewDialog(QTableWidget *sourceTable, QWidget *parent = nullptr);
     ~CategoryReviewDialog() override;
+    void refreshFromSource();
 
 signals:
     void openFileLocationRequested(int row);
+    void deleteSelectedRequested();
 
 private:
     enum Section { CacheSection, MediaSection, PersonalSection, ProtectedSection, SectionCount };
@@ -27,6 +29,7 @@ private:
     void populate();
     void showSection(int section);
     void addFileItem(int row);
+    void updateDeleteAction();
 
     Ui::CategoryReviewDialog *ui;
     QTableWidget *m_sourceTable;
