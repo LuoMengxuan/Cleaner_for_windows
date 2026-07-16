@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFont>
+#include <QFrame>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -23,12 +24,13 @@
 #include <QPaintEvent>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QSignalBlocker>
+#include <QScrollArea>
 #include <QStorageInfo>
 #include <QStringList>
 #include <QTableWidget>
 #include <QThread>
 #include <QTimer>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QProcess>
@@ -653,117 +655,141 @@ void MainWindow::showCategoryReview()
     }
 
     QDialog dialog(this);
-    dialog.setWindowTitle(QStringLiteral("分类查看与确认"));
+    dialog.setWindowTitle(QStringLiteral("扫描文件分类"));
     dialog.setModal(true);
-    dialog.resize(1080, 610);
+    dialog.resize(1080, 700);
     QVBoxLayout *layout = new QVBoxLayout(&dialog);
     QLabel *intro = new QLabel(QStringLiteral(
-        "缓存与临时文件已默认勾选；视频、照片、文稿和压缩包需要你主动确认。"
-        "<br><b>点击任意文件路径</b>即可打开它所在的位置，系统和软件配置文件始终不可勾选。"), &dialog);
+        "按下下方任意分类按钮即可展开或收起文件列表。缓存与临时文件已默认勾选；"
+        "视频、照片、文稿等需要你主动确认。<br><b>点击文件路径</b>即可打开所在位置；"
+        "系统与软件配置文件始终不可勾选。"), &dialog);
     intro->setWordWrap(true);
     intro->setStyleSheet(QStringLiteral("QLabel { color: #245274; padding: 8px 10px; background: #edf8fb; border-radius: 8px; }"));
     layout->addWidget(intro);
 
-    QTreeWidget tree(&dialog);
-    tree.setColumnCount(5);
-    tree.setHeaderLabels({QStringLiteral("选择"), QStringLiteral("分类"), QStringLiteral("文件路径（点击打开）"),
-                          QStringLiteral("大小"), QStringLiteral("处理建议")});
-    tree.setRootIsDecorated(true);
-    tree.setAlternatingRowColors(true);
-    tree.setUniformRowHeights(true);
-    tree.header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    tree.header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    tree.header()->setSectionResizeMode(2, QHeaderView::Stretch);
-    tree.header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-    tree.header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
-    layout->addWidget(&tree, 1);
+    QScrollArea scrollArea(&dialog);
+    scrollArea.setWidgetResizable(true);
+    scrollArea.setFrameShape(QFrame::NoFrame);
+    QWidget *content = new QWidget(&scrollArea);
+    QVBoxLayout *contentLayout = new QVBoxLayout(content);
+    contentLayout->setContentsMargins(1, 2, 1, 2);
+    contentLayout->setSpacing(9);
 
-    QTreeWidgetItem *groups[3] = {nullptr, nullptr, nullptr};
-    {
-        QSignalBlocker blocker(&tree);
-        for (int row = 0; row < m_table->rowCount(); ++row) {
-            QTableWidgetItem *check = m_table->item(row, 0);
-            if (!check)
-                continue;
-            const FileSafetyLevel level = static_cast<FileSafetyLevel>(check->data(Qt::UserRole).toInt());
-            const int groupIndex = static_cast<int>(level);
-            if (!groups[groupIndex]) {
-                groups[groupIndex] = new QTreeWidgetItem(&tree);
-                groups[groupIndex]->setText(0, safetyGroupName(level));
-                groups[groupIndex]->setData(0, Qt::UserRole, groupIndex);
-                groups[groupIndex]->setFirstColumnSpanned(true);
-                if (level == ProtectedFile) {
-                    groups[groupIndex]->setFlags(Qt::ItemIsEnabled);
-                } else {
-                    groups[groupIndex]->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
-                    groups[groupIndex]->setCheckState(0, level == DefaultCleanableCache ? Qt::Checked : Qt::Unchecked);
-                }
-            }
+    enum ReviewSection { CacheSection, MediaSection, PersonalSection, ProtectedSection, SectionCount };
+    const QString sectionTitles[SectionCount] = {
+        QStringLiteral("默认可清理 · 缓存与临时文件"),
+        QStringLiteral("请确认 · 视频与照片"),
+        QStringLiteral("请确认 · 文稿、压缩包与其他文件"),
+        QStringLiteral("已保护 · 系统文件与软件配置")
+    };
+    QTreeWidget *sectionTrees[SectionCount] = {nullptr, nullptr, nullptr, nullptr};
+    QToolButton *sectionButtons[SectionCount] = {nullptr, nullptr, nullptr, nullptr};
+    int sectionCounts[SectionCount] = {0, 0, 0, 0};
 
-            QTreeWidgetItem *child = new QTreeWidgetItem(groups[groupIndex]);
-            child->setData(0, Qt::UserRole, row);
-            child->setText(1, m_table->item(row, 3)->text());
-            child->setText(2, m_table->item(row, 1)->text());
-            child->setText(3, m_table->item(row, 2)->text());
-            child->setText(4, m_table->item(row, 4)->text());
-            child->setToolTip(2, QStringLiteral("点击打开文件位置：%1").arg(m_table->item(row, 1)->text()));
-            child->setTextAlignment(0, Qt::AlignCenter);
-            child->setTextAlignment(1, Qt::AlignCenter);
-            child->setTextAlignment(3, Qt::AlignCenter);
-            child->setTextAlignment(4, Qt::AlignCenter);
-            child->setForeground(2, QColor("#1473a5"));
-            if (level == ProtectedFile) {
-                child->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-            } else {
-                child->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
-                child->setCheckState(0, check->checkState());
-            }
-        }
+    auto sectionForRow = [this](int row) {
+        const FileSafetyLevel level = static_cast<FileSafetyLevel>(m_table->item(row, 0)->data(Qt::UserRole).toInt());
+        if (level == ProtectedFile)
+            return ProtectedSection;
+        if (level == DefaultCleanableCache)
+            return CacheSection;
+        const QString category = m_table->item(row, 3)->text();
+        return (category == QStringLiteral("视频") || category == QStringLiteral("图片"))
+            ? MediaSection : PersonalSection;
+    };
+
+    for (int section = 0; section < SectionCount; ++section) {
+        QToolButton *button = new QToolButton(content);
+        button->setCheckable(true);
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        button->setArrowType(Qt::RightArrow);
+        button->setMinimumHeight(42);
+        button->setStyleSheet(QStringLiteral(
+            "QToolButton { text-align: left; padding: 8px 12px; font-size: 14px; font-weight: 700; "
+            "color: #1d5677; background: #f2f9fc; border: 1px solid #c6e1ed; border-radius: 8px; } "
+            "QToolButton:checked { background: #dff2f8; border-color: #68b8d0; }"));
+        contentLayout->addWidget(button);
+
+        QTreeWidget *tree = new QTreeWidget(content);
+        tree->setColumnCount(5);
+        tree->setHeaderLabels({QStringLiteral("选择"), QStringLiteral("文件类型"), QStringLiteral("文件路径（点击打开）"),
+                               QStringLiteral("大小"), QStringLiteral("处理建议")});
+        tree->setRootIsDecorated(false);
+        tree->setAlternatingRowColors(true);
+        tree->setUniformRowHeights(true);
+        tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+        tree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+        tree->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+        tree->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+        tree->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
+        tree->setVisible(false);
+        contentLayout->addWidget(tree);
+        sectionTrees[section] = tree;
+        sectionButtons[section] = button;
     }
 
-    if (groups[DefaultCleanableCache])
-        tree.expandItem(groups[DefaultCleanableCache]);
+    for (int row = 0; row < m_table->rowCount(); ++row) {
+        QTableWidgetItem *check = m_table->item(row, 0);
+        if (!check)
+            continue;
+        const int section = sectionForRow(row);
+        QTreeWidget *tree = sectionTrees[section];
+        QTreeWidgetItem *item = new QTreeWidgetItem(tree);
+        const FileSafetyLevel level = static_cast<FileSafetyLevel>(check->data(Qt::UserRole).toInt());
+        item->setData(0, Qt::UserRole, row);
+        item->setText(1, m_table->item(row, 3)->text());
+        item->setText(2, m_table->item(row, 1)->text());
+        item->setText(3, m_table->item(row, 2)->text());
+        item->setText(4, m_table->item(row, 4)->text());
+        item->setToolTip(2, QStringLiteral("点击打开文件位置：%1").arg(m_table->item(row, 1)->text()));
+        item->setTextAlignment(0, Qt::AlignCenter);
+        item->setTextAlignment(1, Qt::AlignCenter);
+        item->setTextAlignment(3, Qt::AlignCenter);
+        item->setTextAlignment(4, Qt::AlignCenter);
+        item->setForeground(2, QColor("#1473a5"));
+        if (level == ProtectedFile) {
+            item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        } else {
+            item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+            item->setCheckState(0, check->checkState());
+        }
+        ++sectionCounts[section];
+    }
 
-    connect(&tree, &QTreeWidget::itemChanged, &dialog, [this, &tree](QTreeWidgetItem *item, int column) {
-        if (column != 0)
-            return;
-        if (!item->parent()) {
-            const FileSafetyLevel level = static_cast<FileSafetyLevel>(item->data(0, Qt::UserRole).toInt());
-            if (level == ProtectedFile || item->checkState(0) == Qt::PartiallyChecked)
+    for (int section = 0; section < SectionCount; ++section) {
+        QToolButton *button = sectionButtons[section];
+        QTreeWidget *tree = sectionTrees[section];
+        button->setText(QStringLiteral("%1  ·  %2 项").arg(sectionTitles[section]).arg(sectionCounts[section]));
+        if (sectionCounts[section] == 0) {
+            QTreeWidgetItem *empty = new QTreeWidgetItem(tree);
+            empty->setText(2, QStringLiteral("本次扫描没有此类文件"));
+            empty->setFlags(Qt::NoItemFlags);
+        }
+        const int rows = qMax(1, tree->topLevelItemCount());
+        tree->setFixedHeight(qMin(330, 34 + rows * 29));
+        connect(button, &QToolButton::toggled, &dialog, [button, tree](bool expanded) {
+            button->setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow);
+            tree->setVisible(expanded);
+        });
+        connect(tree, &QTreeWidget::itemChanged, &dialog, [this](QTreeWidgetItem *item, int column) {
+            if (column != 0 || !item->flags().testFlag(Qt::ItemIsUserCheckable))
                 return;
-            QSignalBlocker blocker(&tree);
-            for (int i = 0; i < item->childCount(); ++i) {
-                QTreeWidgetItem *child = item->child(i);
-                child->setCheckState(0, item->checkState(0));
-                const int row = child->data(0, Qt::UserRole).toInt();
-                if (QTableWidgetItem *tableCheck = m_table->item(row, 0))
-                    tableCheck->setCheckState(item->checkState(0));
-            }
-            return;
-        }
+            const int row = item->data(0, Qt::UserRole).toInt();
+            if (QTableWidgetItem *tableCheck = m_table->item(row, 0))
+                tableCheck->setCheckState(item->checkState(0));
+        });
+        connect(tree, &QTreeWidget::itemClicked, &dialog, [this](QTreeWidgetItem *item, int column) {
+            if (column != 2 || !item->flags().testFlag(Qt::ItemIsSelectable))
+                return;
+            const int row = item->data(0, Qt::UserRole).toInt();
+            m_table->setCurrentCell(row, 1);
+            openSelectedFileLocation();
+        });
+    }
 
-        const int row = item->data(0, Qt::UserRole).toInt();
-        if (QTableWidgetItem *tableCheck = m_table->item(row, 0))
-            tableCheck->setCheckState(item->checkState(0));
-
-        QTreeWidgetItem *parent = item->parent();
-        int checked = 0;
-        for (int i = 0; i < parent->childCount(); ++i) {
-            if (parent->child(i)->checkState(0) == Qt::Checked)
-                ++checked;
-        }
-        QSignalBlocker blocker(&tree);
-        parent->setCheckState(0, checked == 0 ? Qt::Unchecked
-                                  : checked == parent->childCount() ? Qt::Checked : Qt::PartiallyChecked);
-    });
-
-    connect(&tree, &QTreeWidget::itemClicked, &dialog, [this](QTreeWidgetItem *item, int column) {
-        if (!item->parent() || column != 2)
-            return;
-        const int row = item->data(0, Qt::UserRole).toInt();
-        m_table->setCurrentCell(row, 1);
-        openSelectedFileLocation();
-    });
+    contentLayout->addStretch();
+    scrollArea.setWidget(content);
+    layout->addWidget(&scrollArea, 1);
+    sectionButtons[CacheSection]->setChecked(true);
 
     QDialogButtonBox buttons(QDialogButtonBox::Close, &dialog);
     QPushButton *closeButton = buttons.button(QDialogButtonBox::Close);
