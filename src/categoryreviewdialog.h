@@ -23,12 +23,15 @@ signals:
 private:
     enum Section { CacheSection, MediaSection, PersonalSection, ProtectedSection, SectionCount };
 
-    void setupSection(QToolButton *button, QTreeWidget *tree);
     int sectionForRow(int row) const;
     void populate();
+    void showSection(int section);
+    void addFileItem(int row);
 
     Ui::CategoryReviewDialog *ui;
     QTableWidget *m_sourceTable;
+    QToolButton *m_sectionButtons[SectionCount];
+    int m_counts[SectionCount];
 };
 
 #endif

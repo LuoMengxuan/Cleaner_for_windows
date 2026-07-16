@@ -2,57 +2,54 @@
 <ui version="4.0">
  <class>CategoryReviewDialog</class>
  <widget class="QDialog" name="CategoryReviewDialog">
-  <property name="geometry"><rect><x>0</x><y>0</y><width>1080</width><height>700</height></rect></property>
-  <property name="minimumSize"><size><width>860</width><height>560</height></size></property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>1020</width><height>620</height></rect></property>
+  <property name="minimumSize"><size><width>820</width><height>500</height></size></property>
   <property name="windowTitle"><string>扫描文件分类</string></property>
   <layout class="QVBoxLayout" name="rootLayout">
-   <property name="leftMargin"><number>18</number></property><property name="topMargin"><number>18</number></property><property name="rightMargin"><number>18</number></property><property name="bottomMargin"><number>14</number></property><property name="spacing"><number>10</number></property>
+   <property name="leftMargin"><number>16</number></property><property name="topMargin"><number>16</number></property><property name="rightMargin"><number>16</number></property><property name="bottomMargin"><number>12</number></property><property name="spacing"><number>10</number></property>
    <item>
-    <widget class="QFrame" name="heroFrame">
+    <widget class="QFrame" name="topBar">
      <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
-     <layout class="QHBoxLayout" name="heroLayout">
-      <property name="leftMargin"><number>18</number></property><property name="topMargin"><number>16</number></property><property name="rightMargin"><number>18</number></property><property name="bottomMargin"><number>16</number></property><property name="spacing"><number>14</number></property>
-      <item><widget class="QLabel" name="shieldLabel"><property name="minimumSize"><size><width>52</width><height>52</height></size></property><property name="maximumSize"><size><width>52</width><height>52</height></size></property><property name="text"><string>✓</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
-      <item>
-       <layout class="QVBoxLayout" name="heroTextLayout">
-        <property name="spacing"><number>3</number></property>
-        <item><widget class="QLabel" name="titleLabel"><property name="text"><string>扫描完成，文件已安全分类</string></property></widget></item>
-        <item><widget class="QLabel" name="introLabel"><property name="text"><string>缓存文件已经默认勾选；个人内容请逐项确认。点击路径可直接打开文件所在位置。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-       </layout>
-      </item>
-      <item><spacer name="heroSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>30</width><height>20</height></size></property></spacer></item>
-      <item><widget class="QLabel" name="statusBadge"><property name="text"><string>● 安全检查已完成</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+     <layout class="QHBoxLayout" name="topBarLayout">
+      <property name="leftMargin"><number>15</number></property><property name="topMargin"><number>12</number></property><property name="rightMargin"><number>15</number></property><property name="bottomMargin"><number>12</number></property><property name="spacing"><number>11</number></property>
+      <item><widget class="QLabel" name="shieldLabel"><property name="minimumSize"><size><width>38</width><height>38</height></size></property><property name="maximumSize"><size><width>38</width><height>38</height></size></property><property name="text"><string>✓</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+      <item><layout class="QVBoxLayout" name="topTextLayout"><property name="spacing"><number>1</number></property><item><widget class="QLabel" name="titleLabel"><property name="text"><string>扫描文件分类</string></property></widget></item><item><widget class="QLabel" name="summaryLabel"><property name="text"><string>正在整理扫描结果…</string></property></widget></item></layout></item>
      </layout>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="summaryLayout">
+    <layout class="QHBoxLayout" name="contentLayout">
      <property name="spacing"><number>10</number></property>
-     <item><widget class="QFrame" name="cacheSummaryCard"><layout class="QVBoxLayout" name="cacheSummaryLayout"><property name="leftMargin"><number>14</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>14</number></property><property name="bottomMargin"><number>10</number></property><item><widget class="QLabel" name="cacheSummaryTitle"><property name="text"><string>默认可清理</string></property></widget></item><item><widget class="QLabel" name="cacheCountLabel"><property name="text"><string>0 项缓存文件</string></property></widget></item></layout></widget></item>
-     <item><widget class="QFrame" name="reviewSummaryCard"><layout class="QVBoxLayout" name="reviewSummaryLayout"><property name="leftMargin"><number>14</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>14</number></property><property name="bottomMargin"><number>10</number></property><item><widget class="QLabel" name="reviewSummaryTitle"><property name="text"><string>需要你确认</string></property></widget></item><item><widget class="QLabel" name="reviewCountLabel"><property name="text"><string>0 项个人文件</string></property></widget></item></layout></widget></item>
-     <item><widget class="QFrame" name="protectedSummaryCard"><layout class="QVBoxLayout" name="protectedSummaryLayout"><property name="leftMargin"><number>14</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>14</number></property><property name="bottomMargin"><number>10</number></property><item><widget class="QLabel" name="protectedSummaryTitle"><property name="text"><string>已自动保护</string></property></widget></item><item><widget class="QLabel" name="protectedCountLabel"><property name="text"><string>0 项关键文件</string></property></widget></item></layout></widget></item>
+     <item>
+      <widget class="QFrame" name="categorySidebar">
+       <property name="minimumSize"><size><width>220</width><height>0</height></size></property>
+       <property name="maximumSize"><size><width>260</width><height>16777215</height></size></property>
+       <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
+       <layout class="QVBoxLayout" name="sidebarLayout">
+        <property name="leftMargin"><number>11</number></property><property name="topMargin"><number>12</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>12</number></property><property name="spacing"><number>7</number></property>
+        <item><widget class="QLabel" name="sideTitle"><property name="text"><string>文件分区</string></property></widget></item>
+        <item><widget class="QToolButton" name="cacheButton"><property name="text"><string>缓存与临时文件</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextOnly</enum></property></widget></item>
+        <item><widget class="QToolButton" name="mediaButton"><property name="text"><string>视频与照片</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextOnly</enum></property></widget></item>
+        <item><widget class="QToolButton" name="personalButton"><property name="text"><string>文稿、压缩与其他</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextOnly</enum></property></widget></item>
+        <item><widget class="QToolButton" name="protectedButton"><property name="text"><string>系统与软件配置</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextOnly</enum></property></widget></item>
+        <item><spacer name="sideSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+        <item><widget class="QLabel" name="sideHint"><property name="text"><string>选择一个分类，在右侧查看文件并确认处理方式。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="contentPanel">
+       <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
+       <layout class="QVBoxLayout" name="contentPanelLayout">
+        <property name="leftMargin"><number>13</number></property><property name="topMargin"><number>12</number></property><property name="rightMargin"><number>13</number></property><property name="bottomMargin"><number>12</number></property><property name="spacing"><number>7</number></property>
+        <item><widget class="QLabel" name="currentSectionTitle"><property name="text"><string>缓存与临时文件</string></property></widget></item>
+        <item><widget class="QLabel" name="currentSectionHint"><property name="text"><string>正在加载…</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><widget class="QTreeWidget" name="categoryTree"><property name="alternatingRowColors"><bool>true</bool></property><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="selectionMode"><enum>QAbstractItemView::ExtendedSelection</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property><property name="rootIsDecorated"><bool>false</bool></property></widget></item>
+        <item><widget class="QLabel" name="selectionHint"><property name="text"><string>勾选会同步到主界面；点击路径可打开文件位置进行确认。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+       </layout>
+      </widget>
+     </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QScrollArea" name="categoryScrollArea">
-     <property name="widgetResizable"><bool>true</bool></property>
-     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
-     <widget class="QWidget" name="scrollContent">
-      <property name="geometry"><rect><x>0</x><y>0</y><width>1010</width><height>600</height></rect></property>
-      <layout class="QVBoxLayout" name="sectionsLayout">
-       <property name="leftMargin"><number>2</number></property><property name="topMargin"><number>2</number></property><property name="rightMargin"><number>2</number></property><property name="bottomMargin"><number>2</number></property><property name="spacing"><number>9</number></property>
-       <item><widget class="QToolButton" name="cacheButton"><property name="text"><string>默认可清理 · 缓存与临时文件</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="minimumSize"><size><width>0</width><height>42</height></size></property></widget></item>
-       <item><widget class="QTreeWidget" name="cacheTree"><property name="visible"><bool>false</bool></property><property name="alternatingRowColors"><bool>true</bool></property><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property></widget></item>
-       <item><widget class="QToolButton" name="mediaButton"><property name="text"><string>请确认 · 视频与照片</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="minimumSize"><size><width>0</width><height>42</height></size></property></widget></item>
-       <item><widget class="QTreeWidget" name="mediaTree"><property name="visible"><bool>false</bool></property><property name="alternatingRowColors"><bool>true</bool></property><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property></widget></item>
-       <item><widget class="QToolButton" name="personalButton"><property name="text"><string>请确认 · 文稿、压缩包与其他文件</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="minimumSize"><size><width>0</width><height>42</height></size></property></widget></item>
-       <item><widget class="QTreeWidget" name="personalTree"><property name="visible"><bool>false</bool></property><property name="alternatingRowColors"><bool>true</bool></property><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property></widget></item>
-       <item><widget class="QToolButton" name="protectedButton"><property name="text"><string>已保护 · 系统文件与软件配置</string></property><property name="checkable"><bool>true</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="minimumSize"><size><width>0</width><height>42</height></size></property></widget></item>
-       <item><widget class="QTreeWidget" name="protectedTree"><property name="visible"><bool>false</bool></property><property name="alternatingRowColors"><bool>true</bool></property><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property></widget></item>
-       <item><spacer name="sectionsSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
-      </layout>
-     </widget>
-    </widget>
    </item>
    <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Close</set></property></widget></item>
   </layout>
