@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "categoryreviewdialog.h"
 #include "scanner.h"
 #include "ui_mainwindow.h"
 
@@ -654,6 +655,16 @@ void MainWindow::showCategoryReview()
         return;
     }
 
+    CategoryReviewDialog categoryDialog(m_table, this);
+    connect(&categoryDialog, &CategoryReviewDialog::openFileLocationRequested, this, [this](int row) {
+        m_table->setCurrentCell(row, 1);
+        openSelectedFileLocation();
+    });
+    categoryDialog.exec();
+    updateSelectionState();
+    return;
+
+#if 0 // Replaced by src/categoryreviewdialog.ui and CategoryReviewDialog.
     QDialog dialog(this);
     dialog.setWindowTitle(QStringLiteral("扫描文件分类"));
     dialog.setModal(true);
@@ -798,6 +809,7 @@ void MainWindow::showCategoryReview()
     layout->addWidget(&buttons);
     dialog.exec();
     updateSelectionState();
+#endif
 }
 
 void MainWindow::showFileContextMenu(const QPoint &pos)

@@ -9,14 +9,17 @@ TARGET = VincinzoCleaner
 
 SOURCES += \
     $$PWD/src/main.cpp \
+    $$PWD/src/categoryreviewdialog.cpp \
     $$PWD/src/mainwindow.cpp \
     $$PWD/src/scanner.cpp
 
 HEADERS += \
+    $$PWD/src/categoryreviewdialog.h \
     $$PWD/src/mainwindow.h \
     $$PWD/src/scanner.h
 
 FORMS += \
+    $$PWD/src/categoryreviewdialog.ui \
     $$PWD/src/mainwindow.ui
 
 RESOURCES += \
