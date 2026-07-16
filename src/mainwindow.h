@@ -42,6 +42,7 @@ private slots:
     void selectAllSafe(bool checked);
     void filterSafeFiles(bool enabled);
     void showFileContextMenu(const QPoint &pos);
+    void showCategoryReview();
     void clearResults();
     void refreshDrives();
     void updateSelectionState();
@@ -74,6 +75,7 @@ private:
     QPushButton *m_deleteButton;
     QPushButton *m_openLocationButton;
     QPushButton *m_copyPathButton;
+    QPushButton *m_categoryReviewButton;
     QLabel *m_statusLabel;
     QLabel *m_pathLabel;
     QLabel *m_scanProgressLabel;

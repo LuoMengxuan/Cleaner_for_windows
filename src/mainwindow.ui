@@ -86,10 +86,11 @@
     </item>
     <item>
      <layout class="QHBoxLayout" name="selectionLayout">
-      <item><widget class="QCheckBox" name="selectAllCheckBox"><property name="text"><string>勾选全部可安全移入回收站的文件</string></property></widget></item>
-      <item><widget class="QCheckBox" name="filterSafeCheckBox"><property name="text"><string>只看可清理文件</string></property></widget></item>
+      <item><widget class="QCheckBox" name="selectAllCheckBox"><property name="text"><string>勾选默认可清理的缓存文件</string></property></widget></item>
+      <item><widget class="QCheckBox" name="filterSafeCheckBox"><property name="text"><string>只看默认可清理项</string></property></widget></item>
+      <item><widget class="QPushButton" name="categoryReviewButton"><property name="text"><string>分类查看与确认…</string></property></widget></item>
       <item><spacer name="selectionSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-      <item><widget class="QLabel" name="safetyLabel"><property name="text"><string>系统与程序关键文件仅展示，不可操作</string></property></widget></item>
+      <item><widget class="QLabel" name="safetyLabel"><property name="text"><string>缓存默认勾选；个人文件需确认；系统与软件配置仅展示</string></property></widget></item>
      </layout>
     </item>
     <item><widget class="QLabel" name="statusLabel"><property name="text"><string>准备好了，慢慢来；每一步都由你确认。</string></property></widget></item>

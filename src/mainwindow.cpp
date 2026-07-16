@@ -8,6 +8,8 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QFont>
@@ -21,11 +23,13 @@
 #include <QPaintEvent>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QStorageInfo>
 #include <QStringList>
 #include <QTableWidget>
 #include <QThread>
 #include <QTimer>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QProcess>
 
@@ -52,13 +56,76 @@ struct SelectedFile {
     int row;
     QString path;
     qint64 size;
+    bool needsConfirmation;
 };
+
+enum FileSafetyLevel {
+    ProtectedFile = 0,
+    DefaultCleanableCache,
+    NeedsUserConfirmation
+};
+
+bool isDefaultCleanableCache(const QString &path)
+{
+    const QString normalized = QDir::toNativeSeparators(path).toLower();
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    const QStringList cacheFolders = {
+        QStringLiteral("\\appdata\\local\\temp\\"),
+        QStringLiteral("\\temp\\"),
+        QStringLiteral("\\tmp\\"),
+        QStringLiteral("\\cache\\"),
+        QStringLiteral("\\caches\\"),
+        QStringLiteral("\\cache2\\"),
+        QStringLiteral("\\crashdumps\\")
+    };
+    for (const QString &folder : cacheFolders) {
+        if (normalized.contains(folder))
+            return true;
+    }
+    return normalized.contains(QStringLiteral("\\users\\")) &&
+           (suffix == QStringLiteral("tmp") || suffix == QStringLiteral("temp") ||
+            suffix == QStringLiteral("dmp"));
+}
+
+FileSafetyLevel safetyLevelFor(const QString &path, bool protectedFile)
+{
+    if (protectedFile)
+        return ProtectedFile;
+    return isDefaultCleanableCache(path) ? DefaultCleanableCache : NeedsUserConfirmation;
+}
+
+QString safetyDescription(FileSafetyLevel level)
+{
+    switch (level) {
+    case ProtectedFile:
+        return QStringLiteral("已保护：系统/软件配置");
+    case DefaultCleanableCache:
+        return QStringLiteral("默认勾选：缓存可清理");
+    case NeedsUserConfirmation:
+        return QStringLiteral("请确认：个人/重要文件");
+    }
+    return QString();
+}
+
+QString safetyGroupName(FileSafetyLevel level)
+{
+    switch (level) {
+    case ProtectedFile:
+        return QStringLiteral("已保护：系统文件与软件配置（不可删除）");
+    case DefaultCleanableCache:
+        return QStringLiteral("默认可清理：缓存与临时文件");
+    case NeedsUserConfirmation:
+        return QStringLiteral("请确认后再处理：视频、照片、文稿与其他个人文件");
+    }
+    return QString();
+}
 }
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), m_table(nullptr), m_driveSelector(nullptr),
       m_minimumSize(nullptr), m_scanButton(nullptr), m_stopButton(nullptr), m_deleteButton(nullptr),
-      m_openLocationButton(nullptr), m_copyPathButton(nullptr), m_statusLabel(nullptr),
+      m_openLocationButton(nullptr), m_copyPathButton(nullptr), m_categoryReviewButton(nullptr),
+      m_statusLabel(nullptr),
       m_pathLabel(nullptr), m_scanProgressLabel(nullptr), m_scanProgress(nullptr),
       m_driveLayout(nullptr), m_trayIcon(nullptr),
       m_scanThread(new QThread(this)), m_scanner(new FileScanner),
@@ -117,6 +184,7 @@ void MainWindow::setupUi()
     m_deleteButton = ui->deleteButton;
     m_openLocationButton = ui->openLocationButton;
     m_copyPathButton = ui->copyPathButton;
+    m_categoryReviewButton = ui->categoryReviewButton;
     m_statusLabel = ui->statusLabel;
     m_pathLabel = ui->pathLabel;
     m_scanProgressLabel = ui->scanProgressLabel;
@@ -178,6 +246,7 @@ void MainWindow::setupUi()
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshDrives);
     connect(ui->selectAllCheckBox, &QCheckBox::toggled, this, &MainWindow::selectAllSafe);
     connect(ui->filterSafeCheckBox, &QCheckBox::toggled, this, &MainWindow::filterSafeFiles);
+    connect(m_categoryReviewButton, &QPushButton::clicked, this, &MainWindow::showCategoryReview);
     connect(m_table, &QTableWidget::itemSelectionChanged, this, &MainWindow::updateSelectionState);
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &MainWindow::showFileContextMenu);
     connect(m_driveSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
@@ -230,6 +299,8 @@ QString MainWindow::formatBytes(qint64 bytes)
 QString MainWindow::fileCategory(const QString &path)
 {
     const QString suffix = QFileInfo(path).suffix().toLower();
+    if (isDefaultCleanableCache(path))
+        return QStringLiteral("缓存/临时文件");
     if (QStringList({QStringLiteral("mp4"), QStringLiteral("mkv"), QStringLiteral("avi"),
                      QStringLiteral("mov"), QStringLiteral("wmv"), QStringLiteral("flv")}).contains(suffix))
         return QStringLiteral("视频");
@@ -420,6 +491,7 @@ void MainWindow::setScanning(bool active)
     ui->refreshButton->setEnabled(!active);
     ui->selectAllCheckBox->setEnabled(!active);
     ui->filterSafeCheckBox->setEnabled(!active);
+    m_categoryReviewButton->setEnabled(!active);
     m_table->setEnabled(!active);
     if (active) {
         m_deleteButton->setEnabled(false);
@@ -442,7 +514,7 @@ void MainWindow::showBeginnerGuide()
 void MainWindow::showDeveloperInfo()
 {
     showFriendlyMessage(QStringLiteral("开发者信息"),
-        QStringLiteral("作者：Vincinzo\n版本：1.20\nGit 版本：v1.2.0\n时间：%1")
+        QStringLiteral("作者：Vincinzo\n版本：1.21\nGit 版本：v1.2.1\n时间：%1")
             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))),
         QStringLiteral("Copyright © 2026 Vincinzo. 保留所有权利。\n谢谢你认真照顾自己的电脑。"));
 }
@@ -451,14 +523,18 @@ void MainWindow::addFile(const QString &path, qint64 size, bool protectedFile)
 {
     const int row = m_table->rowCount();
     m_table->insertRow(row);
+    const FileSafetyLevel level = safetyLevelFor(path, protectedFile);
 
     QTableWidgetItem *check = new QTableWidgetItem;
-    check->setCheckState(Qt::Unchecked);
+    check->setCheckState(level == DefaultCleanableCache ? Qt::Checked : Qt::Unchecked);
     check->setTextAlignment(Qt::AlignCenter);
-    check->setData(Qt::UserRole, protectedFile);
-    check->setToolTip(protectedFile ? QStringLiteral("为保护电脑稳定性，此类文件只展示，不提供删除操作。")
-                                    : QStringLiteral("建议先打开文件位置确认，再决定是否放入回收站。"));
-    check->setFlags(protectedFile ? Qt::ItemIsEnabled
+    check->setData(Qt::UserRole, static_cast<int>(level));
+    check->setToolTip(level == ProtectedFile
+                           ? QStringLiteral("为保护电脑稳定性，此类文件只展示，不提供删除操作。")
+                           : level == DefaultCleanableCache
+                               ? QStringLiteral("这是缓存或临时文件，默认已勾选；仍会先放入回收站。")
+                               : QStringLiteral("这可能是你的个人文件，请先打开位置确认后再决定是否放入回收站。"));
+    check->setFlags(level == ProtectedFile ? Qt::ItemIsEnabled
                                   : (Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable));
 
     QTableWidgetItem *pathItem = new QTableWidgetItem(QDir::toNativeSeparators(path));
@@ -466,9 +542,9 @@ void MainWindow::addFile(const QString &path, qint64 size, bool protectedFile)
     SizeTableWidgetItem *sizeItem = new SizeTableWidgetItem(formatBytes(size));
     sizeItem->setData(Qt::UserRole, size);
     QTableWidgetItem *category = new QTableWidgetItem(fileCategory(path));
-    QTableWidgetItem *status = new QTableWidgetItem(protectedFile
-        ? QStringLiteral("已保护：不建议删除") : QStringLiteral("可确认后放入回收站"));
-    status->setForeground(protectedFile ? QColor("#b45359") : QColor("#19705c"));
+    QTableWidgetItem *status = new QTableWidgetItem(safetyDescription(level));
+    status->setForeground(level == ProtectedFile ? QColor("#b45359")
+                          : level == DefaultCleanableCache ? QColor("#19705c") : QColor("#9a6700"));
     sizeItem->setTextAlignment(Qt::AlignCenter);
     category->setTextAlignment(Qt::AlignCenter);
     status->setTextAlignment(Qt::AlignCenter);
@@ -478,7 +554,7 @@ void MainWindow::addFile(const QString &path, qint64 size, bool protectedFile)
     m_table->setItem(row, 2, sizeItem);
     m_table->setItem(row, 3, category);
     m_table->setItem(row, 4, status);
-    if (ui->filterSafeCheckBox->isChecked() && protectedFile)
+    if (ui->filterSafeCheckBox->isChecked() && level != DefaultCleanableCache)
         m_table->setRowHidden(row, true);
 }
 
@@ -521,7 +597,8 @@ void MainWindow::scanFinished(qint64 visited, qint64 matched, qint64 bytes, bool
         showFriendlyMessage(QStringLiteral("太棒了，空间很整洁"),
             QStringLiteral("按照当前大小条件，没有发现需要处理的大文件。你的磁盘状态不错，继续保持就好！"));
     } else {
-        m_pathLabel->setText(QStringLiteral("建议先选中一行并打开文件位置；确认无误后再放入回收站。"));
+        m_pathLabel->setText(QStringLiteral("已默认勾选缓存文件；请在分类窗口中确认视频、照片和文稿等个人内容。"));
+        QTimer::singleShot(0, this, &MainWindow::showCategoryReview);
     }
     QTimer::singleShot(2600, this, [this] {
         if (!m_scanning) {
@@ -535,7 +612,7 @@ void MainWindow::selectAllSafe(bool checked)
 {
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QTableWidgetItem *item = m_table->item(row, 0);
-        if (item && !item->data(Qt::UserRole).toBool())
+        if (item && item->data(Qt::UserRole).toInt() == DefaultCleanableCache)
             item->setCheckState(checked ? Qt::Checked : Qt::Unchecked);
     }
 }
@@ -544,7 +621,7 @@ void MainWindow::resetSelectionUi()
 {
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QTableWidgetItem *item = m_table->item(row, 0);
-        if (item && !item->data(Qt::UserRole).toBool())
+        if (item && item->data(Qt::UserRole).toInt() != ProtectedFile)
             item->setCheckState(Qt::Unchecked);
     }
     m_table->clearSelection();
@@ -557,12 +634,144 @@ void MainWindow::filterSafeFiles(bool enabled)
 {
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QTableWidgetItem *item = m_table->item(row, 0);
-        const bool protectedFile = item && item->data(Qt::UserRole).toBool();
-        m_table->setRowHidden(row, enabled && protectedFile);
+        const bool isDefaultCache = item && item->data(Qt::UserRole).toInt() == DefaultCleanableCache;
+        m_table->setRowHidden(row, enabled && !isDefaultCache);
     }
     m_statusLabel->setText(enabled
-        ? QStringLiteral("现在只显示可清理文件；先确认用途再操作，你做得很稳妥。")
-        : QStringLiteral("已显示全部扫描结果，受保护文件仍不能被删除。"));
+        ? QStringLiteral("现在只显示默认可清理的缓存文件，其他内容需要你主动确认。")
+        : QStringLiteral("已显示全部扫描结果；系统和软件配置文件仍然不能被删除。"));
+}
+
+void MainWindow::showCategoryReview()
+{
+    if (m_scanning)
+        return;
+    if (m_table->rowCount() == 0) {
+        showFriendlyMessage(QStringLiteral("还没有扫描结果"),
+            QStringLiteral("先完成一次扫描，我就能按缓存、个人文件和受保护文件帮你整理。"));
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(QStringLiteral("分类查看与确认"));
+    dialog.setModal(true);
+    dialog.resize(1080, 610);
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+    QLabel *intro = new QLabel(QStringLiteral(
+        "缓存与临时文件已默认勾选；视频、照片、文稿和压缩包需要你主动确认。"
+        "<br><b>点击任意文件路径</b>即可打开它所在的位置，系统和软件配置文件始终不可勾选。"), &dialog);
+    intro->setWordWrap(true);
+    intro->setStyleSheet(QStringLiteral("QLabel { color: #245274; padding: 8px 10px; background: #edf8fb; border-radius: 8px; }"));
+    layout->addWidget(intro);
+
+    QTreeWidget tree(&dialog);
+    tree.setColumnCount(5);
+    tree.setHeaderLabels({QStringLiteral("选择"), QStringLiteral("分类"), QStringLiteral("文件路径（点击打开）"),
+                          QStringLiteral("大小"), QStringLiteral("处理建议")});
+    tree.setRootIsDecorated(true);
+    tree.setAlternatingRowColors(true);
+    tree.setUniformRowHeights(true);
+    tree.header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    tree.header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    tree.header()->setSectionResizeMode(2, QHeaderView::Stretch);
+    tree.header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    tree.header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
+    layout->addWidget(&tree, 1);
+
+    QTreeWidgetItem *groups[3] = {nullptr, nullptr, nullptr};
+    {
+        QSignalBlocker blocker(&tree);
+        for (int row = 0; row < m_table->rowCount(); ++row) {
+            QTableWidgetItem *check = m_table->item(row, 0);
+            if (!check)
+                continue;
+            const FileSafetyLevel level = static_cast<FileSafetyLevel>(check->data(Qt::UserRole).toInt());
+            const int groupIndex = static_cast<int>(level);
+            if (!groups[groupIndex]) {
+                groups[groupIndex] = new QTreeWidgetItem(&tree);
+                groups[groupIndex]->setText(0, safetyGroupName(level));
+                groups[groupIndex]->setData(0, Qt::UserRole, groupIndex);
+                groups[groupIndex]->setFirstColumnSpanned(true);
+                if (level == ProtectedFile) {
+                    groups[groupIndex]->setFlags(Qt::ItemIsEnabled);
+                } else {
+                    groups[groupIndex]->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+                    groups[groupIndex]->setCheckState(0, level == DefaultCleanableCache ? Qt::Checked : Qt::Unchecked);
+                }
+            }
+
+            QTreeWidgetItem *child = new QTreeWidgetItem(groups[groupIndex]);
+            child->setData(0, Qt::UserRole, row);
+            child->setText(1, m_table->item(row, 3)->text());
+            child->setText(2, m_table->item(row, 1)->text());
+            child->setText(3, m_table->item(row, 2)->text());
+            child->setText(4, m_table->item(row, 4)->text());
+            child->setToolTip(2, QStringLiteral("点击打开文件位置：%1").arg(m_table->item(row, 1)->text()));
+            child->setTextAlignment(0, Qt::AlignCenter);
+            child->setTextAlignment(1, Qt::AlignCenter);
+            child->setTextAlignment(3, Qt::AlignCenter);
+            child->setTextAlignment(4, Qt::AlignCenter);
+            child->setForeground(2, QColor("#1473a5"));
+            if (level == ProtectedFile) {
+                child->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            } else {
+                child->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+                child->setCheckState(0, check->checkState());
+            }
+        }
+    }
+
+    if (groups[DefaultCleanableCache])
+        tree.expandItem(groups[DefaultCleanableCache]);
+
+    connect(&tree, &QTreeWidget::itemChanged, &dialog, [this, &tree](QTreeWidgetItem *item, int column) {
+        if (column != 0)
+            return;
+        if (!item->parent()) {
+            const FileSafetyLevel level = static_cast<FileSafetyLevel>(item->data(0, Qt::UserRole).toInt());
+            if (level == ProtectedFile || item->checkState(0) == Qt::PartiallyChecked)
+                return;
+            QSignalBlocker blocker(&tree);
+            for (int i = 0; i < item->childCount(); ++i) {
+                QTreeWidgetItem *child = item->child(i);
+                child->setCheckState(0, item->checkState(0));
+                const int row = child->data(0, Qt::UserRole).toInt();
+                if (QTableWidgetItem *tableCheck = m_table->item(row, 0))
+                    tableCheck->setCheckState(item->checkState(0));
+            }
+            return;
+        }
+
+        const int row = item->data(0, Qt::UserRole).toInt();
+        if (QTableWidgetItem *tableCheck = m_table->item(row, 0))
+            tableCheck->setCheckState(item->checkState(0));
+
+        QTreeWidgetItem *parent = item->parent();
+        int checked = 0;
+        for (int i = 0; i < parent->childCount(); ++i) {
+            if (parent->child(i)->checkState(0) == Qt::Checked)
+                ++checked;
+        }
+        QSignalBlocker blocker(&tree);
+        parent->setCheckState(0, checked == 0 ? Qt::Unchecked
+                                  : checked == parent->childCount() ? Qt::Checked : Qt::PartiallyChecked);
+    });
+
+    connect(&tree, &QTreeWidget::itemClicked, &dialog, [this](QTreeWidgetItem *item, int column) {
+        if (!item->parent() || column != 2)
+            return;
+        const int row = item->data(0, Qt::UserRole).toInt();
+        m_table->setCurrentCell(row, 1);
+        openSelectedFileLocation();
+    });
+
+    QDialogButtonBox buttons(QDialogButtonBox::Close, &dialog);
+    QPushButton *closeButton = buttons.button(QDialogButtonBox::Close);
+    closeButton->setText(QStringLiteral("确认选择，返回主界面"));
+    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::accept);
+    layout->addWidget(&buttons);
+    dialog.exec();
+    updateSelectionState();
 }
 
 void MainWindow::showFileContextMenu(const QPoint &pos)
@@ -601,7 +810,7 @@ void MainWindow::updateSelectionState()
     const int row = m_table ? m_table->currentRow() : -1;
     const bool hasSelection = row >= 0 && m_table->item(row, 1);
     const bool canDelete = hasSelection && m_table->item(row, 0) &&
-                           !m_table->item(row, 0)->data(Qt::UserRole).toBool();
+                           m_table->item(row, 0)->data(Qt::UserRole).toInt() != ProtectedFile;
     m_openLocationButton->setEnabled(!m_scanning && hasSelection);
     m_copyPathButton->setEnabled(!m_scanning && hasSelection);
     m_deleteButton->setEnabled(!m_scanning && (canDelete || m_table->rowCount() > 0));
@@ -635,13 +844,18 @@ void MainWindow::deleteSelected()
 {
     QVector<SelectedFile> selected;
     qint64 total = 0;
+    int needsConfirmationCount = 0;
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QTableWidgetItem *check = m_table->item(row, 0);
-        if (check && check->checkState() == Qt::Checked && !check->data(Qt::UserRole).toBool()) {
+        if (check && check->checkState() == Qt::Checked &&
+            check->data(Qt::UserRole).toInt() != ProtectedFile) {
             const QString path = m_table->item(row, 1)->text();
             const qint64 size = m_table->item(row, 2)->data(Qt::UserRole).toLongLong();
-            selected.push_back({row, path, size});
+            const bool needsConfirmation = check->data(Qt::UserRole).toInt() == NeedsUserConfirmation;
+            selected.push_back({row, path, size, needsConfirmation});
             total += size;
+            if (needsConfirmation)
+                ++needsConfirmationCount;
         }
     }
 
@@ -660,8 +874,13 @@ void MainWindow::deleteSelected()
     confirmation.setIcon(QMessageBox::Question);
     confirmation.setText(QStringLiteral("准备将 %1 个文件（约 %2）放入回收站。")
                              .arg(selected.size()).arg(formatBytes(total)));
-    confirmation.setInformativeText(QStringLiteral("请确认这些文件确实不再需要。即使放进回收站，暂时也还能恢复。\n\n%1%2")
-        .arg(preview.join(QStringLiteral("\n")), selected.size() > 5 ? QStringLiteral("\n……") : QString()));
+    const QString reviewReminder = needsConfirmationCount > 0
+        ? QStringLiteral("其中有 %1 个视频、照片、文稿或其他个人文件；请确认它们不是你要保留的内容。\n\n")
+              .arg(needsConfirmationCount)
+        : QString();
+    confirmation.setInformativeText(QStringLiteral("%1请确认这些文件确实不再需要。即使放进回收站，暂时也还能恢复。\n\n%2%3")
+        .arg(reviewReminder, preview.join(QStringLiteral("\n")),
+             selected.size() > 5 ? QStringLiteral("\n……") : QString()));
     QPushButton *moveButton = confirmation.addButton(QStringLiteral("放心放入回收站"), QMessageBox::AcceptRole);
     confirmation.addButton(QStringLiteral("我再看看"), QMessageBox::RejectRole);
     confirmation.exec();
